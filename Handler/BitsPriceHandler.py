@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-import ccxt
+# import ccxt
 
 from Dao.UserListDao import UserListDao
 from Dao.TransactionRecordDao import TransactionRecordDao
@@ -21,10 +21,11 @@ class BitsPriceHandler():
         ))
         self.user = event["user"]
 
-        exchange = ccxt.binance() # TODO: refine parameters
-        symbol = 'BTC/USDT'
-        # 获取当前价格
-        price = Decimal(exchange.fetch_ticker(symbol)['last'])
+        # exchange = ccxt.binance() # TODO: refine parameters
+        # symbol = 'BTC/USDT'
+        # # 获取当前价格
+        # price = Decimal(exchange.fetch_ticker(symbol)['last'])
+        price = Decimal("12345")
         if self.__buy_signal(price):
             self.__buy(price)
         elif self.sell_signal(price):
