@@ -1,12 +1,15 @@
 from decimal import Decimal
 import datetime
+import json
 
+from Model.AbstractRecord import AbstractRecord
+from Model.AbstractRecord import AbstractRecordBuilder
 from UserStatus import UserStatus
 
-class UserListRecordBuilder():
+class UserListRecordBuilder(AbstractRecordBuilder):
     def __int__(self):
+        super().__int__()
         self.user = None
-        self.create_time = None
         self.cur_bits = Decimal("0")
         self.cur_usdt = Decimal("0")
         self.init_bits = Decimal("0")
@@ -18,9 +21,6 @@ class UserListRecordBuilder():
 
     def with_user(self, user):
         self.user = user
-        return self
-    def with_create_time(self, create_time):
-        self.create_time = Decimal(create_time)
         return self
     def with_cur_bits(self, cur_bits):
         self.cur_bits = Decimal(cur_bits)
@@ -50,6 +50,7 @@ class UserListRecordBuilder():
         user_list_record = UserListRecord()
         user_list_record.set_user(self.user)
         user_list_record.set_create_time(self.create_time)
+        user_list_record.set_last_update_time(self.last_update_time)
         user_list_record.set_cur_bits(self.cur_bits)
         user_list_record.set_cur_usdt(self.cur_usdt)
         user_list_record.set_init_bits(self.init_bits)
@@ -60,10 +61,10 @@ class UserListRecordBuilder():
         user_list_record.set_has_position(self.has_position)
         return user_list_record
 
-class UserListRecord():
+class UserListRecord(AbstractRecord):
     def __int__(self):
+        super().__int__()
         self.user = None
-        self.create_time = None
         self.cur_bits = Decimal("0")
         self.cur_usdt = Decimal("0")
         self.init_bits = Decimal("0")
@@ -75,9 +76,6 @@ class UserListRecord():
 
     def set_user(self, user: str):
         self.user = user
-
-    def set_create_time(self, create_time: datetime.datetime):
-        self.create_time = create_time
 
     def set_cur_bits(self, cur_bits: Decimal):
         self.cur_bits = Decimal(cur_bits)
@@ -103,3 +101,17 @@ class UserListRecord():
 
     def set_has_position(self, has_position: bool):
         self.has_position = has_position
+
+    @staticmethod
+    def from_dict(obj_dict):
+        return UserListRecordBuilder() \
+            .with_user(obj_dict["user"]) \
+            .with_create_time(obj_dict["create_time"]) \
+            .with_last_update_time(obj_dict["last_update_time"]) \
+            .with_cur_bits(obj_dict["cur_bits"] if "cur_bits" in obj_dict else Decimal("0")) \
+            .with_cur_usdt(obj_dict["cur_usdt"] if "cur_usdt" in obj_dict else Decimal("0")) \
+            .with_init_bits(obj_dict["init_bits"] if "init_bits" in obj_dict else Decimal("0")) \
+            .with_init_usdt(obj_dict["init_usdt"] if "init_usdt" in obj_dict else Decimal("0")) \
+            .with_expected_buy_price(obj_dict["expected_buy_price"] if "expected_buy_price" in obj_dict else Decimal("0")) \
+            .with_expected_sell_price(obj_dict["expected_sell_price"] if "expected_sell_price" in obj_dict else Decimal("0")) \
+            .build()

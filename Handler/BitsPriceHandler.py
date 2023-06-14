@@ -1,3 +1,4 @@
+import decimal
 from datetime import datetime
 from decimal import Decimal
 # import ccxt
@@ -5,9 +6,13 @@ from decimal import Decimal
 from Dao.UserListDao import UserListDao
 from Dao.TransactionListDao import TransactionListDao
 
+from Model.UserListRecord import UserListRecord
+from Model.UserListRecord import UserListRecordBuilder
+
 class BitsPriceHandler():
 
     START_PROCESS_LOG = "[{}] Start to process message {}"
+    WARN_PROCRESS_LOG = "[{}] WARN: {}"
     ERROR_PROCESS_LOG = "[{}] Failed to process message {} with error {}"
     CREATE_USER_MODE = "CREATE_USER"
     CLOSE_USER_MODE = "CLOSE_USER"
@@ -52,6 +57,23 @@ class BitsPriceHandler():
         elif self.sell_signal(price):
             self.__sell(price)
 
+    def __create_user(self, event):
+        user_list_with_same_name = self.user_list_dao.query(event["user"])
+        if "Items" in user_list_with_same_name and user_list_with_same_name["Items"]:
+            print(BitsPriceHandler.WARN_PROCRESS_LOG.format(
+                datetime.utcnow().isoformat(),
+                f"user {event['user']} already exists, please user another user name"
+            ))
+            return
+        user_list_record = UserListRecordBuilder() \
+            .with_user(event["user"]) \
+            .with_create_time(datetime.utcnow().isoformat()) \
+            .with_last_update_time(datetime.utcnow().isoformat()) \
+            .with_cur_usdt(decimal.Decimal(event["init_usdt"])) \
+            .with_init_usdt(decimal.Decimal(event["init_usdt"])) \
+            .build()
+
+        self.user_list_dao.write(user_list_record.to_dict())
 
     def __buy_signal(self, price):
         return True
