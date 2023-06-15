@@ -20,6 +20,7 @@ class AbstractRecordBuilder():
 
 class AbstractRecord():
     def __int__(self):
+        # Sort Key
         self.create_time = None
         self.last_update_time = None
 

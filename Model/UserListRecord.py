@@ -9,6 +9,7 @@ from UserStatus import UserStatus
 class UserListRecordBuilder(AbstractRecordBuilder):
     def __int__(self):
         super().__int__()
+        # Primary Key
         self.user = None
         self.cur_bits = Decimal("0")
         self.cur_usdt = Decimal("0")
@@ -101,6 +102,9 @@ class UserListRecord(AbstractRecord):
 
     def set_has_position(self, has_position: bool):
         self.has_position = has_position
+
+    def is_active_user(self):
+        return self.status == UserStatus.NORMAL
 
     @staticmethod
     def from_dict(obj_dict):

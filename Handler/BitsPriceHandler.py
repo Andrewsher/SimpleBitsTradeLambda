@@ -8,6 +8,7 @@ from Dao.TransactionListDao import TransactionListDao
 
 from Model.UserListRecord import UserListRecord
 from Model.UserListRecord import UserListRecordBuilder
+from Model.UserStatus import UserStatus
 
 class BitsPriceHandler():
 
@@ -58,11 +59,11 @@ class BitsPriceHandler():
             self.__sell(price)
 
     def __create_user(self, event):
-        user_list_with_same_name = self.user_list_dao.query(event["user"])
-        if "Items" in user_list_with_same_name and user_list_with_same_name["Items"]:
+        queried_user = self.user_list_dao.get_latest_item(event["user"])
+        if queried_user and UserListRecord.from_dict(queried_user).is_active_status():
             print(BitsPriceHandler.WARN_PROCRESS_LOG.format(
                 datetime.utcnow().isoformat(),
-                f"user {event['user']} already exists, please user another user name"
+                f"Active user {event['user']} already exists, please user another user name"
             ))
             return
         user_list_record = UserListRecordBuilder() \
@@ -74,6 +75,23 @@ class BitsPriceHandler():
             .build()
 
         self.user_list_dao.write(user_list_record.to_dict())
+        return
+
+    def __close_user(self, event):
+        queried_user = self.user_list_dao.get_latest_item(event["user"])
+        if not queried_user or not UserListRecord.from_dict(queried_user).is_active_status():
+            print(BitsPriceHandler.WARN_PROCRESS_LOG.format(
+                datetime.utcnow().isoformat(),
+                f"Cannot close active user {event['user']} because it does not exist"
+            ))
+            return
+        user_list_record: UserListRecord = UserListRecord.from_dict(queried_user)
+        price = self.__get_price()
+        self.__sell_all(user_list_record, price)
+        self.__calculate_profit(user_list_record, price)
+        user_list_record.set_status(UserStatus.CLOSED)
+        self.user_list_dao.write(user_list_record.to_dict())
+        return
 
     def __buy_signal(self, price):
         return True

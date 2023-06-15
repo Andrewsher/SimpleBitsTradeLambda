@@ -12,8 +12,10 @@ class UserListDao:
 
     def get_latest_item(self, user):
         items: list = self.query(user)["Items"]
-        items.sort(key=lambda item: datetime.fromisoformat(item["create_time"]), reverse=True)
-        return items[0]
+        if items:
+            items.sort(key=lambda item: datetime.fromisoformat(item["create_time"]), reverse=True)
+            return items[0]
+        return None
 
     def query(self, user: str):
         return self.table.query(KeyConditionExpression=Key('user').eq(user))

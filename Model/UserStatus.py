@@ -1,5 +1,6 @@
 import enum
 class UserStatus(enum.Enum):
-    NORMAL = "normal"
-    CREATING = "creating"
-    EXCEPTION = "exception"
+    NORMAL = "NORMAL"
+    CREATING = "CREATING"
+    EXCEPTION = "EXCEPTION"
+    CLOSED = "CLOSED"
