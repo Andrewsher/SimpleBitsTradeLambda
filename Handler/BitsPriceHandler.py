@@ -2,7 +2,7 @@ import decimal
 import random
 from datetime import datetime
 from decimal import Decimal
-# import ccxt
+import binance
 import boto3
 import math
 
@@ -21,13 +21,20 @@ class BitsPriceHandler():
     CREATE_USER_MODE = "CREATE_USER"
     CLOSE_USER_MODE = "CLOSE_USER"
     CALCULATE_PROFIT_MODE = "CALCULATE_PROFIT"
-    DEFAULT_MODE = "DEFAULT"
+    DEFAULT_MODE = "TRIGGER_TRANSACTION"
+    NOTIFY_SNS_ARN = "arn:aws:sns:us-west-2:672682740254:DeliverMessageToEmail"
     SNS_MESSAGE_SUBJECT = "Profit Calculation Result"
+    LOWEST_POSITION = {
+        "BTC": Decimal("0.2"),
+        "ETH":  Decimal("2")
+    }
+    LOWEST_UDST = Decimal("100")
 
     def __int__(self):
         self.user_list_dao = UserListDao()
         self.txn_list_dao = TransactionListDao()
-        self.user_record = None
+        self.event = None
+        self.user_record: UserListRecord = None
         self.mode = None
         self.price = None
         self.sns_client = None
@@ -37,16 +44,19 @@ class BitsPriceHandler():
             datetime.utcnow().isoformat(),
             event
         ))
+        self.event = event
         try:
-            self.mode = event["mode"]
+            self.mode = self.event["mode"]
+            self.user_record = self.__query_user(self.event["user"])
+            self.__get_price()
             if self.mode == BitsPriceHandler.CREATE_USER_MODE:
-                self.__create_user(event)
+                self.__create_user()
             elif self.mode == BitsPriceHandler.CLOSE_USER_MODE:
-                self.__close_user(event)
+                self.__close_user()
             elif self.mode == BitsPriceHandler.CALCULATE_PROFIT_MODE:
-                self.__calculate_profit_by_event(event)
+                self.__calculate_profit()
             else:
-                self.__trigger_transaction(event)
+                self.__trigger_transaction()
         except Exception as e:
             print(BitsPriceHandler.ERROR_PROCESS_LOG.format(
                 datetime.utcnow().isoformat(),
@@ -54,87 +64,80 @@ class BitsPriceHandler():
                 e
             ))
 
-    def __create_user(self, event):
-        queried_user = self.user_list_dao.get_latest_item(event["user"])
-        if queried_user and UserListRecord.from_dict(queried_user).is_active_status():
+    def __create_user(self):
+        if self.user_record:
             print(BitsPriceHandler.WARN_PROCRESS_LOG.format(
                 datetime.utcnow().isoformat(),
-                f"Active user {event['user']} already exists, please user another user name"
+                f"Active user {self.event['user']} already exists, please user another user name"
             ))
             return
-        user_list_record = UserListRecordBuilder() \
-            .with_user(event["user"]) \
-            .with_create_time(datetime.utcnow().isoformat()) \
-            .with_last_update_time(datetime.utcnow().isoformat()) \
-            .with_cur_usdt(decimal.Decimal(event["init_usdt"])) \
-            .with_init_usdt(decimal.Decimal(event["init_usdt"])) \
-            .build()
-
-        self.user_list_dao.write(user_list_record.to_dict())
-        return
-
-    def __close_user(self, event):
-        user_list_record = self.__query_user(event["user"])
-        price = self.__get_price()
-        self.__sell_all(user_list_record, price)
-        self.__calculate_profit(user_list_record)
-        user_list_record.set_status(UserStatus.CLOSED)
-        self.user_list_dao.write(user_list_record.to_dict())
-        return
-
-    def __calculate_profit_by_event(self, event):
-        user_list_record = self.__query_user(event["user"])
-        self.__calculate_profit(user_list_record)
-        return
-
-    def __query_user(self, user_name):
-        queried_user = self.user_list_dao.get_latest_item(user_name)
-        if not queried_user or not UserListRecord.from_dict(queried_user).is_active_status():
-            print(BitsPriceHandler.WARN_PROCRESS_LOG.format(
-                datetime.utcnow().isoformat(),
-                f"Cannot close active user {user_name} because it does not exist"
-            ))
-            return
-        user_list_record: UserListRecord = UserListRecord.from_dict(queried_user)
-        return user_list_record
-
-    def __sell_all(self, user_list_record: UserListRecord, price: Decimal):
-        self.__sell(user_list_record, price, user_list_record.cur_bits)
-        return
-
-    def __buy_signal(self, price):
-        return True
-
-    def __buy(self, price):
-        # do something
-        pass
-
-    def __get_price(self):
-        # TODO: 获取实时价格
-        self.price = Decimal(random.random())
-        return self.price
-
-    def __sell(self, user_list_record: UserListRecord, price: Decimal, bits_unit: Decimal):
-        assert user_list_record.cur_bits >= bits_unit
-        # TODO: 线上购买
-        user_list_record.set_cur_bits(user_list_record.cur_bits - bits_unit)
-        user_list_record.set_cur_usdt(user_list_record.cur_usdt + price * bits_unit)
-        return
-
-    def __calculate_profit(self, user_list_record: UserListRecord):
-        s = f"Init USDT: {user_list_record.init_usdt}"
-        s += f"\nInit Bits Unit: {user_list_record.init_bits}"
-        init_assets = user_list_record.init_usdt +user_list_record.init_bits * self.price
-        s += f"\nInit assets: {init_assets}"
-        s += f"\nCurrent USDT: {user_list_record.cur_usdt}"
-        s += f"\nCurrent Bits Unit: {user_list_record.cur_bits}"
         if not self.price:
             self.__get_price()
-        s += f", which deserves {user_list_record.cur_bits * self.price}"
-        cur_asset = user_list_record.cur_usdt + user_list_record.cur_bits * self.price
+        self.user_record: UserListRecord = UserListRecordBuilder() \
+            .with_user(self.event["user"]) \
+            .with_currency(self.event["currency"]) \
+            .with_create_time(datetime.utcnow().isoformat()) \
+            .with_last_update_time(datetime.utcnow().isoformat()) \
+            .with_cur_usdt(decimal.Decimal(self.event["init_usdt"])) \
+            .with_init_usdt(decimal.Decimal(self.event["init_usdt"])) \
+            .with_expected_buy_price(self.price * Decimal("0.5")) \
+            .build()
+
+        self.__write_to_db()
+        return
+
+    def __close_user(self):
+        if not self.user_record:
+            return
+        self.__sell_all()
+        self.__calculate_profit()
+        self.user_record.set_status(UserStatus.CLOSED)
+        self.__write_to_db()
+        return
+
+    def __trigger_transaction(self):
+        if self.price <= self.user_record.expected_buy_price:
+            if self.user_record.cur_usdt <= BitsPriceHandler.LOWEST_UDST:
+                pass
+            elif self.user_record.cur_bits == Decimal("0"):
+                self.__buy(self.user_record.cur_usdt / self.price / 2)
+                self.user_record.set_expected_sell_price(
+                    self.user_record.current_position_cost / self.user_record.cur_bits * 2)
+                self.__calculate_profit()
+            elif self.price < self.user_record.expected_buy_price * Decimal("0.5"):
+                self.__buy(self.user_record.cur_usdt / self.price)
+                self.user_record.set_expected_sell_price(
+                    self.user_record.current_position_cost / self.user_record.cur_bits * 2)
+                self.__calculate_profit()
+
+        elif self.price > self.user_record.expected_buy_price * 2:
+            self.user_record.expected_buy_price = self.price * Decimal("0.5")
+
+        if self.user_record.cur_bits > Decimal("0") and self.price > self.user_record.expected_sell_price:
+            if self.user_record.cur_bits <= BitsPriceHandler.LOWEST_POSITION[self.user_record.currency]:
+                self.__sell(self.user_record.cur_bits)
+                self.__calculate_profit()
+            else:
+                self.__sell(self.user_record.cur_bits / 2)
+                self.__calculate_profit()
+
+        self.__write_to_db()
+        return
+
+    def __calculate_profit(self):
+        s = f"Init USDT: {self.user_record.init_usdt}"
+        s += f"\nInit Bits Unit: {self.user_record.init_bits}"
+        init_assets = self.user_record.init_usdt +self.user_record.init_bits * self.price
+        s += f"\nInit assets: {init_assets}"
+        s += f"\nCurrent USDT: {self.user_record.cur_usdt}"
+        s += f"\nCurrent Bits Unit: {self.user_record.cur_bits}"
+        if not self.price:
+            self.__get_price()
+        s += f", which deserves {self.user_record.cur_bits * self.price}"
+        cur_asset = self.user_record.cur_usdt + self.user_record.cur_bits * self.price
         s += f"\nCurrent assets: {cur_asset}"
         s += f"\nProfit rate: {round((cur_asset / init_assets - 1) * 100, 2)} %"
-        passed_time = datetime.utcnow() - user_list_record.create_time
+        passed_time = datetime.utcnow() - self.user_record.create_time
         s += f"\nPassed {passed_time.days} days, {passed_time.seconds} seconds"
         years = Decimal(passed_time.total_seconds()) / (86400 * 365)
         s += f"\nPassed {round(years, 2)} years"
@@ -143,12 +146,52 @@ class BitsPriceHandler():
         self.__notify(s)
         return
 
+    def __query_user(self, user_name):
+        queried_user = self.user_list_dao.get_latest_item(user_name)
+        if not queried_user or not UserListRecord.from_dict(queried_user).is_active_status():
+            print(BitsPriceHandler.WARN_PROCRESS_LOG.format(
+                datetime.utcnow().isoformat(),
+                f"Cannot get active user {user_name} because it does not exist or already been closed"
+            ))
+            return
+        user_list_record: UserListRecord = UserListRecord.from_dict(queried_user)
+        return user_list_record
+
+    def __get_price(self):
+        # TODO: 获取实时价格
+        self.price = Decimal(random.random())
+        return self.price
+
+    def __buy(self, bits_unit: Decimal):
+        assert self.user_record.cur_usdt >= bits_unit * self.price
+        # TODO 线上购买
+        self.user_record.set_current_position_cost(self.user_record.current_position_cost + bits_unit * self.price)
+        self.user_record.set_cur_bits(self.user_record.cur_bits + bits_unit)
+        self.user_record.set_cur_usdt(self.user_record.cur_usdt - bits_unit * self.price)
+        return
+
+    def __sell_all(self):
+        self.__sell(self.user_record.cur_bits)
+        return
+
+    def __sell(self, bits_unit: Decimal):
+        assert self.user_record.cur_bits >= bits_unit
+        # TODO: 线上购买
+        self.user_record.set_current_position_cost(self.user_record.current_position_cost * (1 - bits_unit / self.user_record.cur_bits))
+        self.user_record.set_cur_bits(self.user_record.cur_bits - bits_unit)
+        self.user_record.set_cur_usdt(self.user_record.cur_usdt + self.price * bits_unit)
+        return
+
     def __notify(self, message):
         if not self.sns_client:
             self.sns_client = boto3.client("sns")
         self.sns_client.publish(
-            TargetArn="arn:aws:sns:us-west-2:672682740254:DeliverMessageToEmail",
+            TargetArn=BitsPriceHandler.NOTIFY_SNS_ARN,
             Message=message,
             Subject=BitsPriceHandler.SNS_MESSAGE_SUBJECT
         )
+        return
+
+    def __write_to_db(self):
+        self.user_list_dao.write(self.user_record.to_dict())
         return
