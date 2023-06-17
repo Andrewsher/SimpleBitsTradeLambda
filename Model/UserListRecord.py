@@ -7,8 +7,8 @@ from Model.AbstractRecord import AbstractRecordBuilder
 from UserStatus import UserStatus
 
 class UserListRecordBuilder(AbstractRecordBuilder):
-    def __int__(self):
-        super().__int__()
+    def __init__(self):
+        super().__init__()
         # Primary Key
         self.user = None
         self.currency = "BTC"
@@ -68,8 +68,8 @@ class UserListRecordBuilder(AbstractRecordBuilder):
         return user_list_record
 
 class UserListRecord(AbstractRecord):
-    def __int__(self):
-        super().__int__()
+    def __init__(self):
+        super().__init__()
         self.user = None
         self.currency = "BTC"
         self.cur_bits = Decimal("0")
@@ -126,6 +126,7 @@ class UserListRecord(AbstractRecord):
             .with_cur_usdt(obj_dict["cur_usdt"] if "cur_usdt" in obj_dict else Decimal("0")) \
             .with_init_bits(obj_dict["init_bits"] if "init_bits" in obj_dict else Decimal("0")) \
             .with_init_usdt(obj_dict["init_usdt"] if "init_usdt" in obj_dict else Decimal("0")) \
+            .with_status(UserStatus(obj_dict["status"]) if "status" in obj_dict else UserStatus.NORMAL) \
             .with_expected_buy_price(obj_dict["expected_buy_price"] if "expected_buy_price" in obj_dict else Decimal("0")) \
             .with_expected_sell_price(obj_dict["expected_sell_price"] if "expected_sell_price" in obj_dict else Decimal("0")) \
             .with_current_position_cost(obj_dict["current_position_cost"] if "current_position_cost" in obj_dict else Decimal("0")) \

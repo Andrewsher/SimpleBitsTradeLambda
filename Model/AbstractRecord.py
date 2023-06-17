@@ -3,7 +3,7 @@ import datetime
 
 
 class AbstractRecordBuilder():
-    def __int__(self):
+    def __init__(self):
         self.create_time = None
         self.last_update_time = None
 
@@ -12,6 +12,8 @@ class AbstractRecordBuilder():
         return self
     def with_last_update_time(self, last_update_time):
         self.last_update_time = last_update_time
+        return self
+
     def build(self):
         user_list_record = AbstractRecord()
         user_list_record.set_create_time(self.create_time)
@@ -19,7 +21,7 @@ class AbstractRecordBuilder():
         return user_list_record
 
 class AbstractRecord():
-    def __int__(self):
+    def __init__(self):
         # Sort Key
         self.create_time = None
         self.last_update_time = None
@@ -37,5 +39,5 @@ class AbstractRecord():
     def from_dict(obj_dict):
         return AbstractRecordBuilder() \
             .with_create_time(obj_dict["create_time"]) \
-            .with_cur_bits(obj_dict["cur_bits"] if "cur_bits" in obj_dict else Decimal("0")) \
+            .with_last_update_time(obj_dict["last_update_time"]) \
             .build()
