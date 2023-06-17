@@ -3,6 +3,9 @@ import random
 from datetime import datetime
 from decimal import Decimal
 import binance
+import logging
+from binance.spot import Spot as Client
+from binance.lib.utils import config_logging
 import boto3
 import math
 
@@ -29,6 +32,10 @@ class BitsPriceHandler():
         "ETH":  Decimal("2")
     }
     LOWEST_UDST = Decimal("100")
+    AVAIL_CURRENCY = {
+        "BTC",
+        "ETH"
+    }
 
     def __int__(self):
         self.user_list_dao = UserListDao()
@@ -37,7 +44,10 @@ class BitsPriceHandler():
         self.user_record: UserListRecord = None
         self.mode = None
         self.price = None
+        self.currency = None
         self.sns_client = None
+        config_logging(logging, logging.INFO)
+        self.spot_client = Client(base_url="https://testnet.binance.vision")
 
     def handle_request(self, event: dict):
         print(BitsPriceHandler.START_PROCESS_LOG.format(
@@ -71,8 +81,6 @@ class BitsPriceHandler():
                 f"Active user {self.event['user']} already exists, please user another user name"
             ))
             return
-        if not self.price:
-            self.__get_price()
         self.user_record: UserListRecord = UserListRecordBuilder() \
             .with_user(self.event["user"]) \
             .with_currency(self.event["currency"]) \
@@ -83,7 +91,7 @@ class BitsPriceHandler():
             .with_expected_buy_price(self.price * Decimal("0.5")) \
             .build()
 
-        self.__write_to_db()
+        self.__write_user_to_db()
         return
 
     def __close_user(self):
@@ -92,7 +100,7 @@ class BitsPriceHandler():
         self.__sell_all()
         self.__calculate_profit()
         self.user_record.set_status(UserStatus.CLOSED)
-        self.__write_to_db()
+        self.__write_user_to_db()
         return
 
     def __trigger_transaction(self):
@@ -121,7 +129,7 @@ class BitsPriceHandler():
                 self.__sell(self.user_record.cur_bits / 2)
                 self.__calculate_profit()
 
-        self.__write_to_db()
+        self.__write_user_to_db()
         return
 
     def __calculate_profit(self):
@@ -131,8 +139,6 @@ class BitsPriceHandler():
         s += f"\nInit assets: {init_assets}"
         s += f"\nCurrent USDT: {self.user_record.cur_usdt}"
         s += f"\nCurrent Bits Unit: {self.user_record.cur_bits}"
-        if not self.price:
-            self.__get_price()
         s += f", which deserves {self.user_record.cur_bits * self.price}"
         cur_asset = self.user_record.cur_usdt + self.user_record.cur_bits * self.price
         s += f"\nCurrent assets: {cur_asset}"
@@ -158,9 +164,18 @@ class BitsPriceHandler():
         return user_list_record
 
     def __get_price(self):
-        # TODO: 获取实时价格
-        self.price = Decimal(random.random())
-        return self.price
+        self.__get_currency()
+        price_dict = self.spot_client.ticker_price(self.currency + "USDT")
+        self.price = Decimal(price_dict["price"])
+        return
+
+    def __get_currency(self):
+        if self.mode == BitsPriceHandler.CREATE_USER_MODE:
+            self.currency = self.event["currency"]
+        else:
+            self.currency = self.user_record.currency
+        assert self.currency in BitsPriceHandler.AVAIL_CURRENCY
+        return
 
     def __buy(self, bits_unit: Decimal):
         assert self.user_record.cur_usdt >= bits_unit * self.price
@@ -192,6 +207,6 @@ class BitsPriceHandler():
         )
         return
 
-    def __write_to_db(self):
+    def __write_user_to_db(self):
         self.user_list_dao.write(self.user_record.to_dict())
         return
