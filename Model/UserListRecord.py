@@ -4,7 +4,7 @@ import json
 
 from Model.AbstractRecord import AbstractRecord
 from Model.AbstractRecord import AbstractRecordBuilder
-from UserStatus import UserStatus
+from Model.UserStatus import UserStatus
 
 class UserListRecordBuilder(AbstractRecordBuilder):
     def __init__(self):

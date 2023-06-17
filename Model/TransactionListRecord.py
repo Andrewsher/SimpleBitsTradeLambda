@@ -4,7 +4,7 @@ import json
 
 from Model.AbstractRecord import AbstractRecord
 from Model.AbstractRecord import AbstractRecordBuilder
-from TxnType import TxnType
+from Model.TxnType import TxnType
 
 class TransactionListRecordBuilder(AbstractRecordBuilder):
     def __init__(self):
