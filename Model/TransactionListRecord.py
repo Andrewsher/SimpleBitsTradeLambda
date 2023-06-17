@@ -26,7 +26,7 @@ class TransactionListRecordBuilder(AbstractRecordBuilder):
         return self
 
     def with_txn_type(self, txn_type: TxnType):
-        self.txn_type = TxnType(txn_type)
+        self.txn_type = txn_type
         return self
 
     def with_currency(self, currency: str):
@@ -68,6 +68,7 @@ class TransactionListRecordBuilder(AbstractRecordBuilder):
     def build(self):
         transactionListRecord = TransactionListRecord()
         transactionListRecord.user = self.user
+        transactionListRecord.create_time = self.create_time
         transactionListRecord.txn_type = self.txn_type
         transactionListRecord.currency = self.currency
         transactionListRecord.bits = self.bits
@@ -96,8 +97,16 @@ class TransactionListRecord(AbstractRecord):
         self.usdt_after_txn = None
         self.extension_info = None
 
+    def to_dict(self):
+        obj_dict = self.__dict__
+        obj_dict["txn_type"] = self.txn_type.value
+        obj_dict["create_time"] = self.create_time.isoformat()
+        obj_dict["last_update_time"] = self.last_update_time.isoformat() if self.last_update_time else None
+        return obj_dict
+
     @staticmethod
     def from_dict(obj_dict):
+        # TODO: refind type
         builder = TransactionListRecordBuilder() \
             .with_user(obj_dict["user"]) \
             .with_create_time(obj_dict["create_time"]) \

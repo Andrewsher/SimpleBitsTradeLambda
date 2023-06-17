@@ -40,7 +40,7 @@ class UserListRecordBuilder(AbstractRecordBuilder):
         self.init_usdt = Decimal(init_usdt)
         return self
     def with_status(self, status: UserStatus):
-        self.status = UserStatus(status)
+        self.status = status
         return self
     def with_expected_buy_price(self, expected_buy_price):
         self.expected_buy_price = Decimal(expected_buy_price)
@@ -100,7 +100,7 @@ class UserListRecord(AbstractRecord):
         self.init_usdt = Decimal(init_usdt)
 
     def set_status(self, status: UserStatus):
-        self.status = UserStatus(status)
+        self.status = status
 
     def set_expected_buy_price(self, expected_buy_price: Decimal):
         self.expected_buy_price = Decimal(expected_buy_price)
@@ -115,13 +115,20 @@ class UserListRecord(AbstractRecord):
     def is_active_user(self):
         return self.status == UserStatus.NORMAL
 
+    def to_dict(self):
+        obj_dict = self.__dict__
+        obj_dict["status"] = self.status.value
+        obj_dict["create_time"] = self.create_time.isoformat()
+        obj_dict["last_update_time"] = self.last_update_time.isoformat()
+        return obj_dict
+
     @staticmethod
     def from_dict(obj_dict):
         return UserListRecordBuilder() \
             .with_user(obj_dict["user"]) \
             .with_currency(obj_dict["currency"]) \
-            .with_create_time(obj_dict["create_time"]) \
-            .with_last_update_time(obj_dict["last_update_time"]) \
+            .with_create_time(datetime.datetime.fromisoformat(obj_dict["create_time"])) \
+            .with_last_update_time(datetime.datetime.fromisoformat(obj_dict["last_update_time"])) \
             .with_cur_bits(obj_dict["cur_bits"] if "cur_bits" in obj_dict else Decimal("0")) \
             .with_cur_usdt(obj_dict["cur_usdt"] if "cur_usdt" in obj_dict else Decimal("0")) \
             .with_init_bits(obj_dict["init_bits"] if "init_bits" in obj_dict else Decimal("0")) \

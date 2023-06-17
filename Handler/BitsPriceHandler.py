@@ -44,7 +44,7 @@ class BitsPriceHandler():
     }
     BINANCE_URL = "https://testnet.binance.vision"
 
-    def __int__(self):
+    def __init__(self):
         self.user_list_dao = UserListDao()
         self.txn_list_dao = TransactionListDao()
         self.event = None
@@ -81,6 +81,7 @@ class BitsPriceHandler():
                 event,
                 e
             ))
+            raise e
 
     def __create_user(self):
         if self.user_record:
@@ -92,8 +93,8 @@ class BitsPriceHandler():
         self.user_record: UserListRecord = UserListRecordBuilder() \
             .with_user(self.event["user"]) \
             .with_currency(self.event["currency"]) \
-            .with_create_time(datetime.utcnow().isoformat()) \
-            .with_last_update_time(datetime.utcnow().isoformat()) \
+            .with_create_time(datetime.utcnow()) \
+            .with_last_update_time(datetime.utcnow()) \
             .with_cur_usdt(decimal.Decimal(self.event["init_usdt"])) \
             .with_init_usdt(decimal.Decimal(self.event["init_usdt"])) \
             .with_expected_buy_price(self.price * Decimal("0.5")) \
@@ -101,8 +102,8 @@ class BitsPriceHandler():
 
         self.txn_record: TransactionListRecord = TransactionListRecordBuilder() \
             .with_user(self.event["user"]) \
-            .with_create_time(datetime.utcnow().isoformat()) \
-            .with_last_update_time(datetime.utcnow().isoformat()) \
+            .with_create_time(datetime.utcnow()) \
+            .with_last_update_time(datetime.utcnow()) \
             .with_txn_type(TxnType.CREATE_USER) \
             .with_currency(self.event["currency"]) \
             .with_bits_after_txn(Decimal("0")) \
@@ -211,7 +212,9 @@ class BitsPriceHandler():
 
     def __query_user(self, user_name):
         queried_user = self.user_list_dao.get_latest_item(user_name)
-        if not queried_user or not UserListRecord.from_dict(queried_user).is_active_status():
+        if self.mode == BitsPriceHandler.CREATE_USER_MODE:
+            return queried_user
+        if not queried_user or not UserListRecord.from_dict(queried_user).is_active_user():
             print(BitsPriceHandler.WARN_PROCRESS_LOG.format(
                 datetime.utcnow().isoformat(),
                 f"Cannot get active user {user_name} because it does not exist or already been closed"
@@ -239,7 +242,8 @@ class BitsPriceHandler():
         # TODO 线上购买
         self.txn_record = TransactionListRecordBuilder() \
             .with_user(self.user_record.user) \
-            .with_create_time(datetime.utcnow().isoformat()) \
+            .with_create_time(datetime.utcnow()) \
+            .with_last_update_time(datetime.utcnow()) \
             .with_txn_type(TxnType.BUY) \
             .with_currency(self.user_record.currency) \
             .with_bits(bits_unit) \
@@ -264,7 +268,7 @@ class BitsPriceHandler():
         # TODO: 线上购买
         self.txn_record = TransactionListRecordBuilder() \
             .with_user(self.user_record.user) \
-            .with_create_time(datetime.utcnow().isoformat()) \
+            .with_create_time(datetime.utcnow()) \
             .with_txn_type(TxnType.SELL) \
             .with_currency(self.user_record.currency) \
             .with_bits(bits_unit) \
