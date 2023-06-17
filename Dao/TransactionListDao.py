@@ -1,10 +1,10 @@
 import boto3
 from boto3.dynamodb.conditions import Key
 
-class TransactionRecordDao:
+class TransactionListDao:
     def __init__(self):
         self.dyn_resource = boto3.resource("dynamodb")
-        self.table = self.dyn_resource.Table("transaction_record")
+        self.table = self.dyn_resource.Table("transaction_list")
 
     def get_item(self, user, datetime):
         return self.table.get_item(Key={"user": user, "datetime": datetime})["Item"]

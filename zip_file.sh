@@ -1,0 +1,1 @@
+zip -r ../SimpleBitsTradeLambda.zip Dao/* Handler/* Model/* lambda_function.py LICENSE README.md
