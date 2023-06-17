@@ -84,7 +84,7 @@ class BitsPriceHandler():
             raise e
 
     def __create_user(self):
-        if self.user_record:
+        if self.user_record and self.user_record.is_active_user():
             print(BitsPriceHandler.WARN_PROCRESS_LOG.format(
                 datetime.utcnow().isoformat(),
                 f"Active user {self.event['user']} already exists, please user another user name"
@@ -168,6 +168,7 @@ class BitsPriceHandler():
                 self.__calculate_profit_in_txn()
             else:
                 self.__sell(self.user_record.cur_bits / 2)
+                self.user_record.set_expected_sell_price(self.user_record.expected_sell_price * 2)
                 self.__write_user_to_db()
                 self.__write_txn_to_db()
                 self.__calculate_profit_in_txn()
@@ -175,15 +176,15 @@ class BitsPriceHandler():
         return
 
     def __calculate_profit_in_txn(self):
-        assert self.txn_record.txn_type in {TxnType.BUY, TxnType.SELL}
+        assert self.txn_record.txn_type in {TxnType.BUY, TxnType.SELL, TxnType.BUY.name, TxnType.SELL.name}
         self.__calculate_profit(
             subject=BitsPriceHandler.SNS_MESSAGE_TXN_SUBJECT,
             base_str=f"User: {self.user_record.user}"
-                     + f"\n{self.txn_record.txn_type.value.lower()} {self.txn_record.bits} {self.user_record.currency} "
+                     + f"\n{self.txn_record.txn_type} {self.txn_record.bits} {self.user_record.currency} "
                      + f"at {self.price} USDT"
                      + f"\nCost {self.txn_record.usdt} USDT"
                      + f"\n USDT before txn: {self.txn_record.usdt_before_txn}"
-                     + f"\n {self.user_record.currency} after txn: {self.txn_record.bits_before_txn}"
+                     + f"\n {self.user_record.currency} before txn: {self.txn_record.bits_before_txn}"
         )
 
     def __calculate_profit(self, subject, base_str=None):
@@ -193,19 +194,23 @@ class BitsPriceHandler():
         s += f"\nUser: {self.user_record.user}"
         s += f"\nInit USDT: {self.user_record.init_usdt}"
         s += f"\nInit Bits Unit: {self.user_record.init_bits}"
-        init_assets = self.user_record.init_usdt +self.user_record.init_bits * self.price
+        init_assets = self.user_record.init_usdt + self.user_record.init_bits * self.price
         s += f"\nInit assets: {init_assets}"
         s += f"\nCurrent USDT: {self.user_record.cur_usdt}"
         s += f"\nCurrent Bits Unit: {self.user_record.cur_bits}"
         s += f", which deserves {self.user_record.cur_bits * self.price}"
         cur_asset = self.user_record.cur_usdt + self.user_record.cur_bits * self.price
-        s += f"\nCurrent assets: {cur_asset}"
+        s += f"\nCurrent assets: {cur_asset} USDT"
         s += f"\nProfit rate: {round((cur_asset / init_assets - 1) * 100, 2)} %"
-        passed_time = datetime.utcnow() - self.user_record.create_time
+        if isinstance(self.user_record.create_time, datetime):
+            passed_time = datetime.utcnow() - self.user_record.create_time
+        elif isinstance(self.user_record.create_time, str):
+            passed_time = datetime.utcnow() - datetime.fromisoformat(self.user_record.create_time)
         s += f"\nPassed {passed_time.days} days, {passed_time.seconds} seconds"
         years = Decimal(passed_time.total_seconds()) / (86400 * 365)
         s += f"\nPassed {round(years, 2)} years"
-        s += f"\nYearly profit rate: {round((math.pow(cur_asset / init_assets, 1 / years) - 1) * 100, 2)} %"
+        if years > Decimal("0.2"):
+            s += f"\nYearly profit rate: {round((math.pow(cur_asset / init_assets, 1 / years) - 1) * 100, 2)} %"
         print(s)
         self.__notify(subject, s)
         return
@@ -213,13 +218,12 @@ class BitsPriceHandler():
     def __query_user(self, user_name):
         queried_user = self.user_list_dao.get_latest_item(user_name)
         if self.mode == BitsPriceHandler.CREATE_USER_MODE:
-            return queried_user
+            return UserListRecord.from_dict(queried_user) if queried_user else None
         if not queried_user or not UserListRecord.from_dict(queried_user).is_active_user():
-            print(BitsPriceHandler.WARN_PROCRESS_LOG.format(
+            raise BitsPriceHandler.WARN_PROCRESS_LOG.format(
                 datetime.utcnow().isoformat(),
                 f"Cannot get active user {user_name} because it does not exist or already been closed"
-            ))
-            return
+            )
         user_list_record: UserListRecord = UserListRecord.from_dict(queried_user)
         return user_list_record
 
@@ -257,6 +261,7 @@ class BitsPriceHandler():
         self.user_record.set_current_position_cost(self.user_record.current_position_cost + bits_unit * self.price)
         self.user_record.set_cur_bits(self.user_record.cur_bits + bits_unit)
         self.user_record.set_cur_usdt(self.user_record.cur_usdt - bits_unit * self.price)
+        self.user_record.set_last_update_time(datetime.utcnow())
         return
 
     def __sell_all(self):
@@ -282,6 +287,7 @@ class BitsPriceHandler():
         self.user_record.set_current_position_cost(self.user_record.current_position_cost * (1 - bits_unit / self.user_record.cur_bits))
         self.user_record.set_cur_bits(self.user_record.cur_bits - bits_unit)
         self.user_record.set_cur_usdt(self.user_record.cur_usdt + self.price * bits_unit)
+        self.user_record.set_last_update_time(datetime.utcnow())
         return
 
     def __notify(self, subject, message):
