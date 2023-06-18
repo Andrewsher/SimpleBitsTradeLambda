@@ -126,9 +126,23 @@ class BitsPriceHandler():
     def __close_user(self):
         if not self.user_record:
             return
-        self.__sell_all()
+        if self.user_record.cur_bits > Decimal("0"):
+            self.__sell_all()
+        else:
+            self.txn_record = TransactionListRecordBuilder() \
+                .with_user(self.user_record.user) \
+                .with_create_time(datetime.utcnow()) \
+                .with_txn_type(TxnType.CLOSE_USER) \
+                .with_currency(self.user_record.currency) \
+                .with_bits(Decimal("0")) \
+                .with_usdt(Decimal("0")) \
+                .with_price(self.price) \
+                .with_bits_before_txn(self.user_record.cur_bits) \
+                .with_bits_after_txn(self.user_record.cur_bits) \
+                .with_usdt_before_txn(self.user_record.cur_usdt) \
+                .with_usdt_after_txn(self.user_record.cur_usdt) \
+                .build()
         self.user_record.set_status(UserStatus.CLOSED)
-        self.txn_record.txn_type = TxnType.CLOSE_USER   # TODO: replace by set()
         self.__write_user_to_db()
         self.__write_txn_to_db()
         self.__calculate_profit(
