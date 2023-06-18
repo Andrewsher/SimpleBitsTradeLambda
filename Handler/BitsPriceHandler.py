@@ -126,11 +126,12 @@ class BitsPriceHandler():
     def __close_user(self):
         if not self.user_record:
             return
-        self.__sell_all()
+        if self.user_record.cur_bits > Decimal("0"):
+            self.__sell_all()
+            self.txn_record.txn_type = TxnType.CLOSE_USER  # TODO: replace by set()
+            self.__write_txn_to_db()
         self.user_record.set_status(UserStatus.CLOSED)
-        self.txn_record.txn_type = TxnType.CLOSE_USER   # TODO: replace by set()
         self.__write_user_to_db()
-        self.__write_txn_to_db()
         self.__calculate_profit(
             subject=BitsPriceHandler.SNS_MESSAGE_CLOSE_USER_SUBJECT,
             base_str=f"Close User {self.user_record.user} succeed"
