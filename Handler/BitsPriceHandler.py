@@ -230,6 +230,7 @@ class BitsPriceHandler():
     def __get_price(self):
         self.__get_currency()
         price_dict = self.spot_client.ticker_price(self.currency + "USDT")
+        print(price_dict)
         self.price = Decimal(price_dict["price"])
         return
 
