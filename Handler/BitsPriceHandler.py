@@ -28,7 +28,7 @@ class BitsPriceHandler():
     CLOSE_USER_MODE = "CLOSE_USER"
     CALCULATE_PROFIT_MODE = "CALCULATE_PROFIT"
     DEFAULT_MODE = "TRIGGER_TRANSACTION"
-    NOTIFY_SNS_ARN = "arn:aws:sns:us-west-2:672682740254:DeliverMessageToEmail" # TODO: get arn from SecretManager
+    NOTIFY_SNS_ARN = "arn:aws:sns:ap-southeast-1:672682740254:DeliverMessageToEmail" # TODO: get arn from SecretManager
     SNS_MESSAGE_CREATE_USER_SUBJECT = "Create Digital Coin Trade User"
     SNS_MESSAGE_CLOSE_USER_SUBJECT = "Close Digital Coin Trade User"
     SNS_MESSAGE_PROFIT_CALCULATION_SUBJECT = "Profit Calculation Result"
@@ -42,7 +42,7 @@ class BitsPriceHandler():
         "BTC",
         "ETH"
     }
-    BINANCE_URL = "https://testnet.binance.vision"
+    BINANCE_URL = "https://api.binance.com"
 
     def __init__(self):
         self.user_list_dao = UserListDao()
