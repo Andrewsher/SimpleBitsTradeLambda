@@ -41,7 +41,13 @@ class BitsPriceHandler():
     AVAIL_CURRENCY = {
         "BTC",
         "ETH",
-        "BNB"
+        "BNB",
+        "XRP",
+        "SOL",
+        "ADA",
+        "DOGE",
+        "TRX",
+        "LINK"
     }
     BINANCE_URL = "https://api.binance.com"
 
