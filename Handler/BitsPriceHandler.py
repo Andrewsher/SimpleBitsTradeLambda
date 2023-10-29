@@ -35,7 +35,14 @@ class BitsPriceHandler():
     SNS_MESSAGE_TXN_SUBJECT = "Digital Coin Transaction"
     LOWEST_POSITION = {
         "BTC": Decimal("0.2"),
-        "ETH":  Decimal("2")
+        "ETH":  Decimal("2"),
+        "BNB": Decimal("10"),
+        "XRP": Decimal("6000"),
+        "SOL": Decimal("100"),
+        "ADA": Decimal("10000"),
+        "DOGE": Decimal("50000"),
+        "TRX": Decimal("30000"),
+        "LINK": Decimal("300")
     }
     LOWEST_UDST = Decimal("100")
     AVAIL_CURRENCY = {
