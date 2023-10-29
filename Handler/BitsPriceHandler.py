@@ -40,7 +40,8 @@ class BitsPriceHandler():
     LOWEST_UDST = Decimal("100")
     AVAIL_CURRENCY = {
         "BTC",
-        "ETH"
+        "ETH",
+        "BNB"
     }
     BINANCE_URL = "https://api.binance.com"
 
