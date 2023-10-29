@@ -186,6 +186,7 @@ class BitsPriceHandler():
 
         elif self.price > self.user_record.expected_buy_price * 2:
             self.user_record.expected_buy_price = self.price * Decimal("0.5")
+            self.user_record.set_last_update_time(datetime.utcnow())
             self.__write_user_to_db()
 
         if self.user_record.cur_bits > Decimal("0") and self.price > self.user_record.expected_sell_price:
